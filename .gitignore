@@ -70,6 +70,8 @@ qlib_csv_1min/
 qlib_csv_5min/
 qlib_csv_daily/
 qlib_data/
+qlib_data_1min/
+qlib_data_5min/
 
 # Root level data files
 *.csv
