@@ -166,5 +166,173 @@ def main():
     tq.close()
     print(f"\n完成! 更新了 {updated} 个合约")
 
+def update_5min(code, start_date, end_date):
+    field_list = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'VolInStock']
+    result = tq.get_market_data(
+        field_list=field_list,
+        stock_list=[code],
+        start_time=start_date,
+        end_time=end_date,
+        period='5m',
+        dividend_type='none',
+        count=24000
+    )
+    
+    if not result or 'Open' not in result:
+        return None
+    
+    dfs = []
+    for field in field_list:
+        if field in result:
+            df = result[field].copy()
+            if code in df.columns:
+                df.columns = [field]
+                dfs.append(df)
+    
+    if not dfs:
+        return None
+    
+    merged = dfs[0]
+    for df in dfs[1:]:
+        merged = merged.join(df, how='outer')
+    
+    merged = merged.reset_index()
+    merged.columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount', 'open_interest']
+    merged['code'] = code
+    return merged
+
+def get_latest_date_5m(code):
+    path = os.path.join(BASE_DIR, 'futures_5m', f'{code}.csv')
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path)
+    if 'datetime' not in df.columns:
+        return None
+    return df['datetime'].max()
+
+def update_daily(code, start_date, end_date):
+    field_list = ['Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'VolInStock']
+    result = tq.get_market_data(
+        field_list=field_list,
+        stock_list=[code],
+        start_time=start_date,
+        end_time=end_date,
+        period='1d',
+        dividend_type='none',
+        count=5000
+    )
+    
+    if not result or 'Open' not in result:
+        return None
+    
+    dfs = []
+    for field in field_list:
+        if field in result:
+            df = result[field].copy()
+            if code in df.columns:
+                df.columns = [field]
+                dfs.append(df)
+    
+    if not dfs:
+        return None
+    
+    merged = dfs[0]
+    for df in dfs[1:]:
+        merged = merged.join(df, how='outer')
+    
+    merged = merged.reset_index()
+    merged.columns = ['datetime', 'open', 'high', 'low', 'close', 'volume', 'amount', 'open_interest']
+    merged['code'] = code
+    return merged
+
+def get_latest_date_daily(code):
+    path = os.path.join(BASE_DIR, 'futures_daily', f'{code}.csv')
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path)
+    if 'datetime' not in df.columns:
+        return None
+    return df['datetime'].max()
+
+def update_5min_all():
+    tq.initialize(__file__)
+    print("初始化成功")
+    
+    contracts_dir = os.path.join(BASE_DIR, 'futures_data')
+    contracts = [f.replace('.csv', '') for f in os.listdir(contracts_dir) if f.endswith('.csv')]
+    print(f"共 {len(contracts)} 个合约")
+    
+    os.makedirs(os.path.join(BASE_DIR, 'futures_5m'), exist_ok=True)
+    
+    updated = 0
+    for i, code in enumerate(contracts):
+        print(f"[{i+1}/{len(contracts)}] {code}", end=" ", flush=True)
+        
+        latest = get_latest_date_5m(code)
+        if latest is None:
+            print("无历史数据, 跳过")
+            continue
+        
+        today = datetime.now().strftime('%Y%m%d')
+        if latest[:8] >= today:
+            print("已是最新")
+            continue
+        
+        result = update_5min(code, latest[:8], today)
+        if result is not None and len(result) > 0:
+            existing = pd.read_csv(os.path.join(BASE_DIR, 'futures_5m', f'{code}.csv'))
+            combined = pd.concat([existing, result]).drop_duplicates()
+            combined = combined.sort_values('datetime').reset_index(drop=True)
+            combined.to_csv(os.path.join(BASE_DIR, 'futures_5m', f'{code}.csv'), index=False)
+            print(f"+{len(result)}条 OK")
+            updated += 1
+        else:
+            print("无新数据")
+        
+        time.sleep(0.3)
+    
+    tq.close()
+    print(f"\n完成! 更新了 {updated} 个合约")
+
+def update_daily_all():
+    tq.initialize(__file__)
+    print("初始化成功")
+    
+    contracts_dir = os.path.join(BASE_DIR, 'futures_data')
+    contracts = [f.replace('.csv', '') for f in os.listdir(contracts_dir) if f.endswith('.csv')]
+    print(f"共 {len(contracts)} 个合约")
+    
+    os.makedirs(os.path.join(BASE_DIR, 'futures_daily'), exist_ok=True)
+    
+    updated = 0
+    for i, code in enumerate(contracts):
+        print(f"[{i+1}/{len(contracts)}] {code}", end=" ", flush=True)
+        
+        latest = get_latest_date_daily(code)
+        if latest is None:
+            print("无历史数据, 跳过")
+            continue
+        
+        today = datetime.now().strftime('%Y%m%d')
+        if latest[:8] >= today:
+            print("已是最新")
+            continue
+        
+        result = update_daily(code, latest[:8], today)
+        if result is not None and len(result) > 0:
+            existing = pd.read_csv(os.path.join(BASE_DIR, 'futures_daily', f'{code}.csv'))
+            combined = pd.concat([existing, result]).drop_duplicates()
+            combined = combined.sort_values('datetime').reset_index(drop=True)
+            combined.to_csv(os.path.join(BASE_DIR, 'futures_daily', f'{code}.csv'), index=False)
+            print(f"+{len(result)}条 OK")
+            updated += 1
+        else:
+            print("无新数据")
+        
+        time.sleep(0.3)
+    
+    tq.close()
+    print(f"\n完成! 更新了 {updated} 个合约")
+
 if __name__ == '__main__':
     main()
