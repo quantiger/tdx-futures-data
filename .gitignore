@@ -66,6 +66,10 @@ futures_daily/
 futures_weekly/
 data/
 cache/
+qlib_csv_1min/
+qlib_csv_5min/
+qlib_csv_daily/
+qlib_data/
 
 # Root level data files
 *.csv
